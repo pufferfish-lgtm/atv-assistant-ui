@@ -2,21 +2,39 @@ import streamlit as st
 import time
 import openai
 
-# Initialize OpenAI client using your API key from secrets
+st.set_page_config(page_title="ATV Assistant", page_icon="🤖", layout="centered")
+
 client = openai.OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 ASSISTANT_ID = st.secrets["ASSISTANT_ID"]
 
-# Initialize session state variables if not present
+# --- SIDEBAR ---
+st.sidebar.title("Settings")
+model = st.sidebar.selectbox(
+    "Model",
+    options=["gpt-4o", "gpt-4-turbo", "gpt-3.5-turbo"],
+    index=0
+)
+uploaded_file = st.sidebar.file_uploader("Upload a file (optional)", type=["pdf", "txt", "docx"])
+
+# --- SESSION STATE ---
 if "messages" not in st.session_state:
     st.session_state.messages = []
 if "thread_id" not in st.session_state:
     thread = client.beta.threads.create()
     st.session_state.thread_id = thread.id
 
+# --- MAIN CHAT INTERFACE ---
+st.title("ATV Assistant 🤖")
+st.markdown("Ask me about CAAP, Sustainability Plan, or other docs…")
+
+# Display chat history
+for msg in st.session_state.messages:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
+
 # --- CHAT INPUT ---
-prompt = st.chat_input("Ask me about CAAP, Sustainability Plan, or other docs…")
+prompt = st.chat_input("Type your question and press Enter...")
 if prompt:
-    # Save user message locally and in the UI
     st.session_state.messages.append({"role": "user", "content": prompt})
     st.chat_message("user").write(prompt)
 
@@ -30,7 +48,8 @@ if prompt:
     # Run the Assistant
     run = client.beta.threads.runs.create(
         thread_id=st.session_state.thread_id,
-        assistant_id=ASSISTANT_ID
+        assistant_id=ASSISTANT_ID,
+        model=model
     )
 
     # Poll until the run completes
@@ -59,11 +78,9 @@ if prompt:
             answer_text += content_block.text.value
             if content_block.text.annotations:
                 for ann in content_block.text.annotations:
-                    # Collect file citation annotations if present
                     if getattr(ann, "file_citation", None):
                         citations.append(ann.file_citation)
 
-    # Display assistant answer
     st.session_state.messages.append({"role": "assistant", "content": answer_text})
     st.chat_message("assistant").write(answer_text)
 
@@ -71,16 +88,12 @@ if prompt:
     if citations:
         st.markdown("**Citations:**")
         for cite in citations:
-            # Try to resolve file name for readability
             try:
                 fmeta = client.files.retrieve(cite.file_id)
                 fname = getattr(fmeta, "filename", cite.file_id)
             except Exception:
                 fname = cite.file_id
-            # Safely get start_index and end_index if they exist
             start = getattr(cite, "start_index", None)
             end = getattr(cite, "end_index", None)
             if start is not None and end is not None:
                 st.markdown(f"- {fname} (chars {start}–{end})")
-            else:
-                st.markdown(f"- {fname}")
