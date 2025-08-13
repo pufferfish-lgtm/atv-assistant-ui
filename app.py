@@ -13,9 +13,8 @@ st.sidebar.title("Settings")
 model = st.sidebar.selectbox(
     "Model",
     options=[
-        "o3",
-        "gpt-5",
-        "gpt-5-mini",
+        "gpt-4.1-mini",
+        "gpt-4.1",
 
     ],
     index=0
