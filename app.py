@@ -1,5 +1,18 @@
 import streamlit as st
 import time
+import openai
+
+# Initialize OpenAI client using your API key from secrets
+client = openai.OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+ASSISTANT_ID = st.secrets["ASSISTANT_ID"]
+
+# Initialize session state variables if not present
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+if "thread_id" not in st.session_state:
+    thread = client.beta.threads.create()
+    st.session_state.thread_id = thread.id
+
 # --- CHAT INPUT ---
 prompt = st.chat_input("Ask me about CAAP, Sustainability Plan, or other docs…")
 if prompt:
@@ -65,4 +78,3 @@ if prompt:
             except Exception:
                 fname = cite.file_id
             st.markdown(f"- {fname} (chars {cite.start_index}–{cite.end_index})")
-
