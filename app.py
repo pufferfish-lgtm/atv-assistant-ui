@@ -67,7 +67,20 @@ if prompt:
     st.session_state.messages.append({"role": "assistant", "content": answer_text})
     st.chat_message("assistant").write(answer_text)
 
-        # Show citations (minimal, readable)
+    # Show citations (minimal, readable)
     if citations:
         st.markdown("**Citations:**")
-        for
+        for cite in citations:
+            # Try to resolve file name for readability
+            try:
+                fmeta = client.files.retrieve(cite.file_id)
+                fname = getattr(fmeta, "filename", cite.file_id)
+            except Exception:
+                fname = cite.file_id
+            # Safely get start_index and end_index if they exist
+            start = getattr(cite, "start_index", None)
+            end = getattr(cite, "end_index", None)
+            if start is not None and end is not None:
+                st.markdown(f"- {fname} (chars {start}–{end})")
+            else:
+                st.markdown(f"- {fname}")
