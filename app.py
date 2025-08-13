@@ -1,5 +1,6 @@
 # --- CHAT INPUT ---
-if prompt := st.chat_input("Ask me about CAAP, Sustainability Plan, or other docs…"):
+prompt = st.chat_input("Ask me about CAAP, Sustainability Plan, or other docs…")
+if prompt:
     # Save user message locally and in the UI
     st.session_state.messages.append({"role": "user", "content": prompt})
     st.chat_message("user").write(prompt)
@@ -62,3 +63,4 @@ if prompt := st.chat_input("Ask me about CAAP, Sustainability Plan, or other doc
             except Exception:
                 fname = cite.file_id
             st.markdown(f"- {fname} (chars {cite.start_index}–{cite.end_index})")
+
