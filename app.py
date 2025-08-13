@@ -1,11 +1,24 @@
 import streamlit as st
 import time
 import openai
+import json
+import os
 
 st.set_page_config(page_title="ATV Assistant", page_icon="🤖", layout="centered")
 
 client = openai.OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 ASSISTANT_ID = st.secrets["ASSISTANT_ID"]
+CHAT_HISTORY_PATH = st.secrets.get("CHAT_HISTORY_PATH", "chat_history.json")
+
+def load_chat_history():
+    if os.path.exists(CHAT_HISTORY_PATH):
+        with open(CHAT_HISTORY_PATH, "r") as f:
+            return json.load(f)
+    return []
+
+def save_chat_history(messages):
+    with open(CHAT_HISTORY_PATH, "w") as f:
+        json.dump(messages, f)
 
 # --- SIDEBAR ---
 st.sidebar.title("Settings")
@@ -20,10 +33,11 @@ model = st.sidebar.selectbox(
     index=0
 )
 uploaded_file = st.sidebar.file_uploader("Upload a file (optional)", type=["pdf", "txt", "docx"])
+search_term = st.sidebar.text_input("Search previous chats")
 
 # --- SESSION STATE ---
 if "messages" not in st.session_state:
-    st.session_state.messages = []
+    st.session_state.messages = load_chat_history()
 if "thread_id" not in st.session_state:
     thread = client.beta.threads.create()
     st.session_state.thread_id = thread.id
@@ -32,10 +46,17 @@ if "thread_id" not in st.session_state:
 st.title("ATV Assistant 🤖")
 st.markdown("Ask me about CAAP, Sustainability Plan, or other docs…")
 
-# Display chat history
-for msg in st.session_state.messages:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
+# Display chat history (searchable)
+if search_term:
+    filtered_chats = [msg for msg in st.session_state.messages if search_term.lower() in msg["content"].lower()]
+    st.markdown("### Search Results")
+    for msg in filtered_chats:
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
+else:
+    for msg in st.session_state.messages:
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
 
 # --- CHAT INPUT ---
 prompt = st.chat_input("Type your question and press Enter...")
@@ -78,11 +99,9 @@ if prompt:
     # Extract text and citations, replacing weird citation markers with readable info
     answer_text = ""
     citations = []
-    citation_map = {}
     for content_block in latest.content:
         if content_block.type == "text":
             answer_text += content_block.text.value
-            # Replace citation markers with readable format
             if content_block.text.annotations:
                 for ann in content_block.text.annotations:
                     if getattr(ann, "file_citation", None):
@@ -92,18 +111,14 @@ if prompt:
                             fname = getattr(fmeta, "filename", cite.file_id)
                         except Exception:
                             fname = cite.file_id
-                        page = getattr(cite, "page", None)
-                        # Build hyperlink for citation (assuming file_id can be used as a link or reference)
-                        # If you have a URL for the file, replace the '#' below with the actual URL
-                        file_url = f"#file-{cite.file_id}"
-                        citation_str = f"[{fname}]({file_url})"
-                        if page is not None:
-                            citation_str += f", page {page}"
+                        # Remove file extension for display (e.g., VTA_CAAP_Vol_1.pdf -> VTA_CAAP)
+                        display_name = os.path.splitext(fname)[0]
+                        # Use (start_index-end_index, display_name) format
+                        citation_str = f"({ann.start_index}-{ann.end_index}, {display_name})"
                         citations.append(citation_str)
-                        # Build marker replacement for (start_index-end_index, filename)
+                        # Replace marker in answer_text
                         marker = f"【{ann.start_index}:{ann.end_index}†{fname}】"
-                        replacement = f"({ann.start_index}-{ann.end_index}, [{fname}]({file_url}))"
-                        answer_text = answer_text.replace(marker, replacement)
+                        answer_text = answer_text.replace(marker, citation_str)
 
     st.session_state.messages.append({"role": "assistant", "content": answer_text})
     st.chat_message("assistant").write(answer_text)
@@ -113,3 +128,6 @@ if prompt:
         st.markdown("**Citations:**")
         for citation_str in citations:
             st.markdown(f"- {citation_str}")
+
+    # Save chat history
+    save_chat_history(st.session_state.messages)
