@@ -93,17 +93,17 @@ if prompt:
                         except Exception:
                             fname = cite.file_id
                         page = getattr(cite, "page", None)
-                        # Build readable citation string
-                        citation_str = f"{fname}"
+                        # Build hyperlink for citation (assuming file_id can be used as a link or reference)
+                        # If you have a URL for the file, replace the '#' below with the actual URL
+                        file_url = f"#file-{cite.file_id}"
+                        citation_str = f"[{fname}]({file_url})"
                         if page is not None:
                             citation_str += f", page {page}"
-                        citation_map[ann.start_index] = citation_str
                         citations.append(citation_str)
-                # Replace markers like 【12:0†source】 with readable citation
-                for idx, citation_str in citation_map.items():
-                    # This is a simple replacement, you may need to adjust for your annotation format
-                    marker = f"【{idx}:0†source】"
-                    answer_text = answer_text.replace(marker, f"[{citation_str}]")
+                        # Build marker replacement for (start_index-end_index, filename)
+                        marker = f"【{ann.start_index}:{ann.end_index}†{fname}】"
+                        replacement = f"({ann.start_index}-{ann.end_index}, [{fname}]({file_url}))"
+                        answer_text = answer_text.replace(marker, replacement)
 
     st.session_state.messages.append({"role": "assistant", "content": answer_text})
     st.chat_message("assistant").write(answer_text)
