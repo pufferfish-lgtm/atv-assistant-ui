@@ -1,3 +1,5 @@
+import streamlit as st
+import time
 # --- CHAT INPUT ---
 prompt = st.chat_input("Ask me about CAAP, Sustainability Plan, or other docs…")
 if prompt:
