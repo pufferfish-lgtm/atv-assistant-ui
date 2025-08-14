@@ -1,34 +1,20 @@
 import streamlit as st
 import time
 import openai
-import json
 import os
 
 st.set_page_config(page_title="ATV Assistant", page_icon="🤖", layout="centered")
 
 client = openai.OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 ASSISTANT_ID = st.secrets["ASSISTANT_ID"]
-CHAT_HISTORY_PATH = st.secrets.get("CHAT_HISTORY_PATH", "chat_history.json")
-
-def load_chat_history():
-    if os.path.exists(CHAT_HISTORY_PATH):
-        with open(CHAT_HISTORY_PATH, "r") as f:
-            return json.load(f)
-    return []
-
-def save_chat_history(messages):
-    with open(CHAT_HISTORY_PATH, "w") as f:
-        json.dump(messages, f)
 
 # --- SIDEBAR ---
 st.sidebar.title("Settings")
-# Expanded model list from OpenAI docs (as of 2025)
 model = st.sidebar.selectbox(
     "Model",
     options=[
         "gpt-4.1-mini",
         "gpt-4.1",
-
     ],
     index=0
 )
@@ -37,7 +23,7 @@ search_term = st.sidebar.text_input("Search previous chats")
 
 # --- SESSION STATE ---
 if "messages" not in st.session_state:
-    st.session_state.messages = load_chat_history()
+    st.session_state.messages = []
 if "thread_id" not in st.session_state:
     thread = client.beta.threads.create()
     st.session_state.thread_id = thread.id
@@ -111,23 +97,16 @@ if prompt:
                             fname = getattr(fmeta, "filename", cite.file_id)
                         except Exception:
                             fname = cite.file_id
-                        # Remove file extension for display (e.g., VTA_CAAP_Vol_1.pdf -> VTA_CAAP)
                         display_name = os.path.splitext(fname)[0]
-                        # Use (start_index-end_index, display_name) format
                         citation_str = f"({ann.start_index}-{ann.end_index}, {display_name})"
                         citations.append(citation_str)
-                        # Replace marker in answer_text
                         marker = f"【{ann.start_index}:{ann.end_index}†{fname}】"
                         answer_text = answer_text.replace(marker, citation_str)
 
     st.session_state.messages.append({"role": "assistant", "content": answer_text})
     st.chat_message("assistant").write(answer_text)
 
-    # Show citations only if present and not blank
     if citations:
         st.markdown("**Citations:**")
         for citation_str in citations:
             st.markdown(f"- {citation_str}")
-
-    # Save chat history
-    save_chat_history(st.session_state.messages)
